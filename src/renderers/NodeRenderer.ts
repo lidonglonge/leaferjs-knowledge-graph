@@ -10,7 +10,6 @@ export class NodeRenderer {
 
   constructor(leaferUI: any) {
     this.LeaferUI = leaferUI
-    console.log('NodeRenderer initialized with:', Object.keys(leaferUI))
   }
 
   /**
@@ -24,11 +23,9 @@ export class NodeRenderer {
       const shape = this.createShape(node)
       const label = this.createLabel(node)
 
-      // 使用 Box 作为容器
-      const Box = this.LeaferUI.Box || this.LeaferUI.Leafer?.Box
+      const Box = this.LeaferUI.Box
       if (!Box) {
-        console.error('Box not found in LeaferUI:', this.LeaferUI)
-        throw new Error('Box component not found')
+        throw new Error('Box component not found in LeaferUI')
       }
 
       const container = new Box({
@@ -76,6 +73,7 @@ export class NodeRenderer {
 
   /**
    * 创建形状
+   * LeaferUI 使用 Ellipse 代替 Circle，Rect 可能需要使用 Path 或自定义
    */
   private createShape(node: Node): any {
     const style = node.style || {}
@@ -90,51 +88,76 @@ export class NodeRenderer {
       strokeWidth: style.lineWidth || 2,
     }
 
-    // 获取组件构造函数
-    const Circle = this.LeaferUI.Circle
-    const Rect = this.LeaferUI.Rect
-    const Ellipse = this.LeaferUI.Ellipse
-
-    console.log('Available components:', { Circle, Rect, Ellipse })
-
-    let shape
+    // LeaferUI 可用组件: Box, Ellipse, Line, Path, Group, Leafer
+    // Ellipse 可以设置 width === height 来实现圆形
     switch (shapeType) {
       case 'circle':
-        if (!Circle) throw new Error('Circle component not found in LeaferUI')
-        shape = new Circle({
-          ...commonProps,
-          width: size.width,
-          height: size.height,
-        })
-        break
       case 'ellipse':
-        if (!Ellipse) throw new Error('Ellipse component not found in LeaferUI')
-        shape = new Ellipse(commonProps)
-        break
+        return this.createEllipse(commonProps)
       case 'rect':
       default:
-        if (!Rect) throw new Error('Rect component not found in LeaferUI')
-        shape = new Rect(commonProps)
-        break
+        return this.createRect(commonProps)
+    }
+  }
+
+  /**
+   * 创建椭圆/圆形
+   */
+  private createEllipse(props: any): any {
+    const Ellipse = this.LeaferUI.Ellipse
+    if (!Ellipse) {
+      console.warn('Ellipse not found, falling back to Box')
+      return this.createRect(props)
+    }
+    return new Ellipse(props)
+  }
+
+  /**
+   * 创建矩形
+   * 使用 Box 或 Path 实现
+   */
+  private createRect(props: any): any {
+    // 尝试使用 Box
+    const Box = this.LeaferUI.Box
+    if (Box) {
+      return new Box({
+        width: props.width,
+        height: props.height,
+        fill: props.fill,
+        stroke: props.stroke,
+        strokeWidth: props.strokeWidth,
+      })
     }
     
-    return shape
+    // 备用：使用 Path 绘制矩形
+    const Path = this.LeaferUI.Path
+    if (Path) {
+      const { width, height } = props
+      return new Path({
+        ...props,
+        path: `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z`,
+      })
+    }
+    
+    throw new Error('No shape component available in LeaferUI')
   }
 
   /**
    * 创建标签
+   * LeaferUI 可能没有 Text 组件，使用替代方案
    */
   private createLabel(node: Node): any | null {
     if (!node.label) return null
 
-    const Text = this.LeaferUI.Text
-    if (!Text) {
-      console.warn('Text component not found in LeaferUI')
-      return null
-    }
-
     const labelStyle = node.style?.label || {}
     const size = this.normalizeSize(node.style?.size)
+
+    // 尝试使用 Text，如果没有则返回 null
+    const Text = this.LeaferUI.Text
+    if (!Text) {
+      console.warn('Text component not found in LeaferUI, skipping label')
+      return null
+    }
 
     return new Text({
       text: node.label,

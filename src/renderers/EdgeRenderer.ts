@@ -3,10 +3,6 @@ import type { EdgeStyle } from '../types'
 
 /**
  * 边渲染器 - 负责将 Edge 对象渲染为 Leafer 图形
- * 
- * 设计原则 (frontend-design):
- * - 展示组件：纯渲染，无业务逻辑
- * - 单一职责：只负责边的渲染
  */
 export class EdgeRenderer {
   private edgeMap = new Map<string, any>()
@@ -19,7 +15,6 @@ export class EdgeRenderer {
 
   /**
    * 创建 Leafer 边
-   * 应用 simplify 技能：提前返回，减少嵌套
    */
   create(edge: Edge): any | null {
     const existing = this.edgeMap.get(edge.id)
@@ -32,18 +27,23 @@ export class EdgeRenderer {
     const style = edge.style || {}
     const edgeType = style.type || 'line'
 
-    const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style)
-    if (!line) return null
+    try {
+      const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style)
+      if (!line) return null
 
-    this.edgeMap.set(edge.id, line)
+      this.edgeMap.set(edge.id, line)
 
-    // 创建标签
-    if (edge.label) {
-      const label = this.createLabel(edge, x1, y1, x2, y2)
-      if (label) this.labelMap.set(edge.id, label)
+      // 创建标签
+      if (edge.label) {
+        const label = this.createLabel(edge, x1, y1, x2, y2)
+        if (label) this.labelMap.set(edge.id, label)
+      }
+
+      return line
+    } catch (error) {
+      console.error('Error creating edge:', error)
+      return null
     }
-
-    return line
   }
 
   /**
@@ -95,7 +95,6 @@ export class EdgeRenderer {
 
   /**
    * 创建边元素
-   * 单一职责函数 (simplify)
    */
   private createEdgeElement(
     x1: number,
@@ -108,8 +107,6 @@ export class EdgeRenderer {
     const commonProps = {
       stroke: style.stroke || '#999',
       strokeWidth: style.lineWidth || 1,
-      opacity: style.opacity ?? 1,
-      dashPattern: style.dashed ? [5, 5] : undefined,
     }
 
     switch (type) {
@@ -117,30 +114,65 @@ export class EdgeRenderer {
         return this.createCurve(x1, y1, x2, y2, commonProps)
       case 'line':
       default:
-        return new this.LeaferUI.Line({
-          ...commonProps,
-          x: x1,
-          y: y1,
-          toX: x2 - x1,
-          toY: y2 - y1,
-        })
+        return this.createLine(x1, y1, x2, y2, commonProps)
     }
   }
 
   /**
-   * 创建曲线边
+   * 创建直线
+   */
+  private createLine(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    props: any
+  ): any | null {
+    // 尝试使用 Line
+    const Line = this.LeaferUI.Line
+    if (Line) {
+      return new Line({
+        ...props,
+        x: x1,
+        y: y1,
+        toX: x2 - x1,
+        toY: y2 - y1,
+      })
+    }
+
+    // 备用：使用 Path
+    const Path = this.LeaferUI.Path
+    if (Path) {
+      return new Path({
+        ...props,
+        path: `M ${x1} ${y1} L ${x2} ${y2}`,
+      })
+    }
+
+    console.warn('Neither Line nor Path found in LeaferUI')
+    return null
+  }
+
+  /**
+   * 创建曲线
    */
   private createCurve(
     x1: number,
     y1: number,
     x2: number,
     y2: number,
-    props: Record<string, unknown>
-  ): any {
+    props: any
+  ): any | null {
+    const Path = this.LeaferUI.Path
+    if (!Path) {
+      console.warn('Path not found, falling back to line')
+      return this.createLine(x1, y1, x2, y2, props)
+    }
+
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2 - 50 // 控制点偏移
 
-    return new this.LeaferUI.Path({
+    return new Path({
       ...props,
       path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`,
     })
@@ -149,12 +181,15 @@ export class EdgeRenderer {
   /**
    * 创建标签
    */
-  private createLabel(edge: Edge, x1: number, y1: number, x2: number, y2: number): any {
+  private createLabel(edge: Edge, x1: number, y1: number, x2: number, y2: number): any | null {
+    const Text = this.LeaferUI.Text
+    if (!Text) return null
+
     const labelStyle = edge.style?.label || {}
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
 
-    return new this.LeaferUI.Text({
+    return new Text({
       text: edge.label,
       fill: labelStyle.fill || '#666',
       fontSize: labelStyle.fontSize || 12,
@@ -174,12 +209,21 @@ export class EdgeRenderer {
     x2: number,
     y2: number
   ): void {
-    if (line instanceof this.LeaferUI.Line) {
-      line.set({ x: x1, y: y1, toX: x2 - x1, toY: y2 - y1 })
-    } else if (line instanceof this.LeaferUI.Path) {
-      const midX = (x1 + x2) / 2
-      const midY = (y1 + y2) / 2 - 50
-      line.set({ path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}` })
+    // 尝试检测类型并更新
+    if (line.set) {
+      line.set({ x: x1, y: y1 })
+      
+      // 如果有 toX/toY 属性，更新它们
+      if (line.toX !== undefined) {
+        line.set({ toX: x2 - x1, toY: y2 - y1 })
+      }
+      
+      // 如果有 path 属性，更新路径
+      if (line.path !== undefined) {
+        const midX = (x1 + x2) / 2
+        const midY = (y1 + y2) / 2 - 50
+        line.set({ path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}` })
+      }
     }
   }
 
@@ -187,6 +231,8 @@ export class EdgeRenderer {
    * 更新标签位置
    */
   private updateLabelPosition(label: any, x1: number, y1: number, x2: number, y2: number): void {
+    if (!label.set) return
+    
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
     label.set({ x: midX, y: midY - 10 })
