@@ -15,6 +15,11 @@
       </div>
       
       <div class="toolbar-right">
+        <el-button-group>
+          <el-button @click="zoomOut" title="缩小">➖</el-button>
+          <el-button @click="fitView" title="适应视图">🔍</el-button>
+          <el-button @click="zoomIn" title="放大">➕</el-button>
+        </el-button-group>
         <el-button type="primary" @click="addRandomNode">
           <Plus />添加节点
         </el-button>
@@ -265,6 +270,46 @@ const switchLayout = () => {
   }
 }
 
+// 适应视图
+const fitView = () => {
+  if (!graph) {
+    ElMessage.warning('图谱未初始化')
+    return
+  }
+  
+  try {
+    graph.fitView()
+    ElMessage.success('已适应视图')
+  } catch (error) {
+    console.error('❌ Fit view error:', error)
+    ElMessage.error('适应视图失败')
+  }
+}
+
+// 放大
+const zoomIn = () => {
+  if (!graph) return
+  
+  try {
+    const currentZoom = graph.getZoom()
+    graph.zoomTo(currentZoom * 1.2)
+  } catch (error) {
+    console.error('❌ Zoom in error:', error)
+  }
+}
+
+// 缩小
+const zoomOut = () => {
+  if (!graph) return
+  
+  try {
+    const currentZoom = graph.getZoom()
+    graph.zoomTo(currentZoom / 1.2)
+  } catch (error) {
+    console.error('❌ Zoom out error:', error)
+  }
+}
+
 // 获取布局名称
 const getLayoutName = (type: string) => {
   const names: Record<string, string> = {
@@ -398,6 +443,7 @@ const copyToClipboard = () => {
 .toolbar-right {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .main-content {

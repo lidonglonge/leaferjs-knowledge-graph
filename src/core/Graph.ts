@@ -284,6 +284,9 @@ export class Graph {
     // 更新边位置
     this.edges.forEach(edge => this.edgeRenderer!.update(edge))
 
+    // 自动适应视图（居中显示）
+    this.fitView()
+
     this.emit('afterlayout', { type: 'afterlayout' })
   }
 
@@ -338,10 +341,13 @@ export class Graph {
   }
 
   /**
-   * 适应视图
+   * 适应视图 - 自动居中并缩放图谱
    */
   fitView(): void {
-    if (!this.app || !this.LeaferUI || this.nodes.size === 0) return
+    if (!this.app || !this.canvasLayer || this.nodes.size === 0) {
+      console.log('Cannot fit view: app or canvasLayer not ready, or no nodes')
+      return
+    }
 
     // 计算边界
     let minX = Infinity
@@ -361,20 +367,89 @@ export class Graph {
     const graphWidth = maxX - minX + padding * 2
     const graphHeight = maxY - minY + padding * 2
 
-    // 计算缩放
-    const scaleX = this.options.width / graphWidth
-    const scaleY = this.options.height / graphHeight
-    const scale = Math.min(scaleX, scaleY, 1)
+    // 计算缩放 - 确保图谱完全显示在视口中
+    const scaleX = (this.options.width - padding * 2) / graphWidth
+    const scaleY = (this.options.height - padding * 2) / graphHeight
+    const scale = Math.min(scaleX, scaleY, 1.5) // 最大放大到 1.5 倍
 
-    // 应用变换
+    // 计算中心点
     const centerX = (minX + maxX) / 2
     const centerY = (minY + maxY) / 2
 
-    this.canvasLayer?.set({
-      x: this.options.width / 2 - centerX * scale,
-      y: this.options.height / 2 - centerY * scale,
+    // 应用变换 - 将图谱中心对准视口中心
+    const offsetX = this.options.width / 2 - centerX * scale
+    const offsetY = this.options.height / 2 - centerY * scale
+
+    console.log('Fitting view:', {
+      bounds: { minX, minY, maxX, maxY },
+      graphSize: { width: graphWidth, height: graphHeight },
+      viewport: { width: this.options.width, height: this.options.height },
       scale,
+      offset: { x: offsetX, y: offsetY }
     })
+
+    // 重置变换并应用新的
+    this.canvasLayer.set({
+      x: offsetX,
+      y: offsetY,
+      scaleX: scale,
+      scaleY: scale,
+    })
+  }
+
+  /**
+   * 居中显示图谱（不改变缩放）
+   */
+  fitCenter(): void {
+    if (!this.canvasLayer || this.nodes.size === 0) return
+
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+
+    this.nodes.forEach(node => {
+      const size = node.getSize()
+      minX = Math.min(minX, node.x - size.width / 2)
+      minY = Math.min(minY, node.y - size.height / 2)
+      maxX = Math.max(maxX, node.x + size.width / 2)
+      maxY = Math.max(maxY, node.y + size.height / 2)
+    })
+
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+
+    // 保持当前缩放，只调整位置
+    const currentScale = this.canvasLayer.scaleX || 1
+    const offsetX = this.options.width / 2 - centerX * currentScale
+    const offsetY = this.options.height / 2 - centerY * currentScale
+
+    this.canvasLayer.set({
+      x: offsetX,
+      y: offsetY,
+    })
+  }
+
+  /**
+   * 缩放到指定比例
+   */
+  zoomTo(scale: number): void {
+    if (!this.canvasLayer) return
+    
+    const centerX = this.options.width / 2
+    const centerY = this.options.height / 2
+    
+    this.canvasLayer.set({
+      scaleX: scale,
+      scaleY: scale,
+    })
+  }
+
+  /**
+   * 获取当前缩放比例
+   */
+  getZoom(): number {
+    return this.canvasLayer?.scaleX || 1
   }
 
   /**
