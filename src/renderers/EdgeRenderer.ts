@@ -1,4 +1,3 @@
-import { Line, Path, Text } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type { Edge } from '../core/Edge'
 import type { EdgeStyle } from '../types'
 
@@ -10,14 +9,19 @@ import type { EdgeStyle } from '../types'
  * - 单一职责：只负责边的渲染
  */
 export class EdgeRenderer {
-  private edgeMap = new Map<string, Line | Path>()
-  private labelMap = new Map<string, Text>()
+  private edgeMap = new Map<string, any>()
+  private labelMap = new Map<string, any>()
+  private LeaferUI: any
+
+  constructor(leaferUI: any) {
+    this.LeaferUI = leaferUI
+  }
 
   /**
    * 创建 Leafer 边
    * 应用 simplify 技能：提前返回，减少嵌套
    */
-  create(edge: Edge): Line | Path | null {
+  create(edge: Edge): any | null {
     const existing = this.edgeMap.get(edge.id)
     if (existing) return existing
 
@@ -28,14 +32,16 @@ export class EdgeRenderer {
     const style = edge.style || {}
     const edgeType = style.type || 'line'
 
-    const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style)
+    const { Line, Path } = this.LeaferUI
+    const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style, { Line, Path })
     if (!line) return null
 
     this.edgeMap.set(edge.id, line)
 
     // 创建标签
     if (edge.label) {
-      const label = this.createLabel(edge, x1, y1, x2, y2)
+      const { Text } = this.LeaferUI
+      const label = this.createLabel(edge, x1, y1, x2, y2, Text)
       if (label) this.labelMap.set(edge.id, label)
     }
 
@@ -99,8 +105,10 @@ export class EdgeRenderer {
     x2: number,
     y2: number,
     type: EdgeStyle['type'],
-    style: EdgeStyle
-  ): Line | Path | null {
+    style: EdgeStyle,
+    components: { Line: any; Path: any }
+  ): any | null {
+    const { Line, Path } = components
     const commonProps = {
       stroke: style.stroke || '#999',
       strokeWidth: style.lineWidth || 1,
@@ -110,7 +118,7 @@ export class EdgeRenderer {
 
     switch (type) {
       case 'curve':
-        return this.createCurve(x1, y1, x2, y2, commonProps)
+        return this.createCurve(x1, y1, x2, y2, commonProps, Path)
       case 'line':
       default:
         return new Line({
@@ -131,8 +139,9 @@ export class EdgeRenderer {
     y1: number,
     x2: number,
     y2: number,
-    props: Record<string, unknown>
-  ): Path {
+    props: Record<string, unknown>,
+    Path: any
+  ): any {
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2 - 50 // 控制点偏移
 
@@ -145,7 +154,14 @@ export class EdgeRenderer {
   /**
    * 创建标签
    */
-  private createLabel(edge: Edge, x1: number, y1: number, x2: number, y2: number): Text {
+  private createLabel(
+    edge: Edge, 
+    x1: number, 
+    y1: number, 
+    x2: number, 
+    y2: number,
+    Text: any
+  ): any {
     const labelStyle = edge.style?.label || {}
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
@@ -164,15 +180,16 @@ export class EdgeRenderer {
    * 更新边位置
    */
   private updateEdgePosition(
-    line: Line | Path,
+    line: any,
     x1: number,
     y1: number,
     x2: number,
     y2: number
   ): void {
-    if (line instanceof Line) {
+    const lineType = line.constructor.name
+    if (lineType === 'Line') {
       line.set({ x: x1, y: y1, toX: x2 - x1, toY: y2 - y1 })
-    } else if (line instanceof Path) {
+    } else if (lineType === 'Path') {
       const midX = (x1 + x2) / 2
       const midY = (y1 + y2) / 2 - 50
       line.set({ path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}` })
@@ -182,7 +199,7 @@ export class EdgeRenderer {
   /**
    * 更新标签位置
    */
-  private updateLabelPosition(label: Text, x1: number, y1: number, x2: number, y2: number): void {
+  private updateLabelPosition(label: any, x1: number, y1: number, x2: number, y2: number): void {
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
     label.set({ x: midX, y: midY - 10 })

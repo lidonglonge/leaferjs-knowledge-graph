@@ -1,4 +1,3 @@
-import { App, Leafer, Box } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type {
   GraphOptions,
   GraphData,
@@ -33,12 +32,13 @@ export class Graph {
   edges: Edge[] = []
 
   // Leafer 实例
-  private app: App | null = null
-  private canvasLayer: Leafer | null = null
+  private app: any = null
+  private canvasLayer: any = null
+  private LeaferUI: any = null
 
   // 渲染器
-  private nodeRenderer = new NodeRenderer()
-  private edgeRenderer = new EdgeRenderer()
+  private nodeRenderer: NodeRenderer | null = null
+  private edgeRenderer: EdgeRenderer | null = null
 
   // 事件监听器
   private eventListeners = new Map<GraphEventType, Set<GraphEventCallback>>()
@@ -56,8 +56,22 @@ export class Graph {
       nodeStyle: options.nodeStyle || {},
       edgeStyle: options.edgeStyle || {},
     }
+  }
 
+  /**
+   * 初始化 Leafer 画布
+   * 需要在运行时传入 LeaferUI 模块
+   */
+  init(leaferUIModule: any): void {
+    if (!leaferUIModule) {
+      console.error('LeaferUI module is required')
+      return
+    }
+
+    this.LeaferUI = leaferUIModule
     this.initLeafer()
+    this.nodeRenderer = new NodeRenderer(leaferUIModule)
+    this.edgeRenderer = new EdgeRenderer(leaferUIModule)
   }
 
   /**
@@ -65,7 +79,9 @@ export class Graph {
    * 单一职责：只负责初始化
    */
   private initLeafer(): void {
+    const { App, Leafer } = this.LeaferUI
     const container = this.getContainer()
+    
     if (!container) {
       console.error('Graph container not found')
       return
@@ -99,6 +115,11 @@ export class Graph {
   setData(data: GraphData): void {
     if (!data?.nodes?.length) {
       this.clear()
+      return
+    }
+
+    if (!this.nodeRenderer || !this.edgeRenderer) {
+      console.error('Graph not initialized. Call init() first.')
       return
     }
 
@@ -153,7 +174,12 @@ export class Graph {
   /**
    * 添加节点
    */
-  addNode(data: NodeData): Node {
+  addNode(data: NodeData): Node | null {
+    if (!this.nodeRenderer) {
+      console.error('Graph not initialized')
+      return null
+    }
+
     const node = new Node(data)
     this.nodes.set(node.id, node)
     this.renderNode(node)
@@ -164,13 +190,15 @@ export class Graph {
    * 移除节点
    */
   removeNode(nodeId: string): boolean {
+    if (!this.nodeRenderer || !this.edgeRenderer) return false
+
     const node = this.nodes.get(nodeId)
     if (!node) return false
 
     // 移除相关边
     this.edges = this.edges.filter(edge => {
       if (edge.source === nodeId || edge.target === nodeId) {
-        this.edgeRenderer.remove(edge.id)
+        this.edgeRenderer!.remove(edge.id)
         return false
       }
       return true
@@ -184,6 +212,11 @@ export class Graph {
    * 添加边
    */
   addEdge(data: EdgeData): Edge | null {
+    if (!this.edgeRenderer) {
+      console.error('Graph not initialized')
+      return null
+    }
+
     const edge = new Edge(data)
     edge.bindNodes(this.nodes)
 
@@ -198,6 +231,8 @@ export class Graph {
    * 移除边
    */
   removeEdge(edgeId: string): boolean {
+    if (!this.edgeRenderer) return false
+
     const index = this.edges.findIndex(e => e.id === edgeId)
     if (index === -1) return false
 
@@ -225,6 +260,11 @@ export class Graph {
    * 单一职责：只负责调用布局算法和更新位置
    */
   async layout(type: string, options?: Record<string, unknown>): Promise<void> {
+    if (!this.nodeRenderer || !this.edgeRenderer) {
+      console.error('Graph not initialized')
+      return
+    }
+
     const layoutResult = this.calculateLayout(type, options)
     if (!layoutResult) return
 
@@ -234,11 +274,11 @@ export class Graph {
       if (!node) return
 
       node.setPosition(x, y)
-      this.nodeRenderer.update(node)
+      this.nodeRenderer!.update(node)
     })
 
     // 更新边位置
-    this.edges.forEach(edge => this.edgeRenderer.update(edge))
+    this.edges.forEach(edge => this.edgeRenderer!.update(edge))
 
     this.emit('afterlayout', { type: 'afterlayout' })
   }
@@ -274,7 +314,7 @@ export class Graph {
    * 委托给渲染器 (frontend-design: 分离渲染逻辑)
    */
   private renderNode(node: Node): void {
-    if (!this.canvasLayer) return
+    if (!this.canvasLayer || !this.nodeRenderer) return
 
     const element = this.nodeRenderer.create(node)
     this.canvasLayer.add(element)
@@ -284,7 +324,7 @@ export class Graph {
    * 渲染边
    */
   private renderEdge(edge: Edge): void {
-    if (!this.canvasLayer) return
+    if (!this.canvasLayer || !this.edgeRenderer) return
 
     const element = this.edgeRenderer.create(edge)
     if (element) this.canvasLayer.add(element)
@@ -297,7 +337,7 @@ export class Graph {
    * 适应视图
    */
   fitView(): void {
-    if (!this.app || this.nodes.size === 0) return
+    if (!this.app || !this.LeaferUI || this.nodes.size === 0) return
 
     // 计算边界
     let minX = Infinity
@@ -338,8 +378,8 @@ export class Graph {
    */
   clear(): void {
     this.clearData()
-    this.nodeRenderer.clear()
-    this.edgeRenderer.clear()
+    this.nodeRenderer?.clear()
+    this.edgeRenderer?.clear()
   }
 
   /**

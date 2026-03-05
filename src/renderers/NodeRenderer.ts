@@ -1,4 +1,3 @@
-import { Box, Rect, Circle, Ellipse, Text } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type { Node } from '../core/Node'
 import type { NodeStyle } from '../types'
 
@@ -10,18 +9,25 @@ import type { NodeStyle } from '../types'
  * - 展示组件：纯渲染，无业务逻辑
  */
 export class NodeRenderer {
-  private nodeMap = new Map<string, Box>()
+  private nodeMap = new Map<string, any>()
+  private LeaferUI: any
+
+  constructor(leaferUI: any) {
+    this.LeaferUI = leaferUI
+  }
 
   /**
    * 创建 Leafer 节点
    * 应用 simplify 技能：提前返回，减少嵌套
    */
-  create(node: Node): Box {
+  create(node: Node): any {
     const existing = this.nodeMap.get(node.id)
     if (existing) return existing
 
-    const shape = this.createShape(node)
-    const label = this.createLabel(node)
+    const { Box, Circle, Rect, Ellipse, Text } = this.LeaferUI
+    
+    const shape = this.createShape(node, { Circle, Rect, Ellipse })
+    const label = this.createLabel(node, Text)
 
     const container = new Box({
       x: node.x,
@@ -59,7 +65,7 @@ export class NodeRenderer {
   /**
    * 获取 Leafer 节点
    */
-  get(nodeId: string): Box | undefined {
+  get(nodeId: string): any | undefined {
     return this.nodeMap.get(nodeId)
   }
 
@@ -74,7 +80,11 @@ export class NodeRenderer {
   /**
    * 创建形状 - 单一职责，一个函数只做一件事 (simplify)
    */
-  private createShape(node: Node): Rect | Circle | Ellipse {
+  private createShape(
+    node: Node, 
+    components: { Circle: any; Rect: any; Ellipse: any }
+  ): any {
+    const { Circle, Rect, Ellipse } = components
     const style = node.style || {}
     const size = this.normalizeSize(style.size)
     const shapeType = style.shape || 'circle'
@@ -106,7 +116,7 @@ export class NodeRenderer {
   /**
    * 创建标签
    */
-  private createLabel(node: Node): Text | null {
+  private createLabel(node: Node, Text: any): any | null {
     if (!node.label) return null
 
     const labelStyle = node.style?.label || {}

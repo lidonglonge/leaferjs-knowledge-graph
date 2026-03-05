@@ -16,10 +16,9 @@
       
       <div class="toolbar-right">
         <el-button type="primary" @click="addRandomNode">
-          <el-icon><Plus /></el-icon>添加节点
+          <Plus />添加节点
         </el-button>
         <el-button @click="exportData">导出数据</el-button>
-        <el-button @click="toggleTheme">切换主题</el-button>
       </div>
     </header>
 
@@ -86,7 +85,7 @@
 
       <!-- 中间画布区 -->
       <section class="canvas-area">
-        <div ref="graphContainer" class="graph-container" :class="{ dark: isDark }"></div>
+        <div ref="graphContainer" class="graph-container"></div>
       </section>
     </main>
 
@@ -110,6 +109,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
+import * as LeaferUI from 'leafer-ui'
 import { Graph } from 'leaferjs-knowledge-graph'
 import type { GraphData } from 'leaferjs-knowledge-graph'
 
@@ -121,7 +121,6 @@ let graph: Graph | null = null
 
 // 状态
 const currentLayout = ref('force')
-const isDark = ref(false)
 const exportDialogVisible = ref(false)
 const exportedData = ref('')
 const activeNames = ref(['nodes'])
@@ -163,9 +162,13 @@ onMounted(() => {
     height: graphContainer.value.clientHeight,
   })
 
+  // 传入 LeaferUI 模块并初始化
+  graph.init(LeaferUI)
+  
+  // 设置数据
   graph.setData(graphData)
   
-  // 延迟应用布局，确保渲染完成
+  // 延迟应用布局
   setTimeout(() => {
     graph?.layout('force')
   }, 100)
@@ -177,7 +180,6 @@ onMounted(() => {
 // 处理窗口调整
 const handleResize = () => {
   if (!graphContainer.value || !graph) return
-  // 重新适应视图
   graph.fitView()
 }
 
@@ -212,20 +214,24 @@ const addRandomNode = () => {
     style: { fill: randomColor }
   }
   
-  graph.addNode(newNode)
-  graphData.nodes.push(newNode)
-  
-  // 随机连接到现有节点
-  if (graphData.nodes.length > 1) {
-    const randomTarget = graphData.nodes[Math.floor(Math.random() * (graphData.nodes.length - 1))].id
-    const newEdge = { source: id, target: randomTarget }
-    graph.addEdge(newEdge)
-    graphData.edges.push(newEdge)
+  const node = graph.addNode(newNode)
+  if (node) {
+    graphData.nodes.push(newNode)
+    
+    // 随机连接到现有节点
+    if (graphData.nodes.length > 1) {
+      const randomTarget = graphData.nodes[Math.floor(Math.random() * (graphData.nodes.length - 1))].id
+      const newEdge = { source: id, target: randomTarget }
+      const edge = graph.addEdge(newEdge)
+      if (edge) {
+        graphData.edges.push(newEdge)
+      }
+    }
+    
+    // 重新应用布局
+    graph.layout(currentLayout.value)
+    ElMessage.success('添加节点成功')
   }
-  
-  // 重新应用布局
-  graph.layout(currentLayout.value)
-  ElMessage.success('添加节点成功')
 }
 
 // 移除节点
@@ -259,12 +265,6 @@ const exportData = () => {
 const copyToClipboard = () => {
   navigator.clipboard.writeText(exportedData.value)
   ElMessage.success('已复制到剪贴板')
-}
-
-// 切换主题
-const toggleTheme = () => {
-  isDark.value = !isDark.value
-  ElMessage.success(`已切换到${isDark.value ? '深色' : '浅色'}主题`)
 }
 </script>
 
@@ -345,10 +345,6 @@ const toggleTheme = () => {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.graph-container.dark {
-  background: #1a1a2e;
 }
 
 .mt-4 {
