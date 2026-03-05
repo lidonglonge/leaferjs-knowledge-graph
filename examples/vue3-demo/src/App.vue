@@ -35,8 +35,8 @@
           </template>
           
           <div class="data-content">
-            <el-collapse v-model="activeNames">
-              <el-collapse-item title="节点列表" name="nodes">
+            <el-tabs v-model="activeTab">
+              <el-tab-pane label="节点" name="nodes">
                 <el-scrollbar max-height="300px">
                   <el-table :data="graphData.nodes" size="small" stripe>
                     <el-table-column prop="id" label="ID" width="60" />
@@ -47,7 +47,6 @@
                           type="danger" 
                           size="small" 
                           @click="removeNode(row.id)"
-                          circle
                         >
                           <Delete />
                         </el-button>
@@ -55,17 +54,17 @@
                     </el-table-column>
                   </el-table>
                 </el-scrollbar>
-              </el-collapse-item>
+              </el-tab-pane>
               
-              <el-collapse-item title="边列表" name="edges">
-                <el-scrollbar max-height="200px">
+              <el-tab-pane label="边" name="edges">
+                <el-scrollbar max-height="300px">
                   <el-table :data="graphData.edges" size="small" stripe>
                     <el-table-column prop="source" label="源" width="80" />
                     <el-table-column prop="target" label="目标" width="80" />
                   </el-table>
                 </el-scrollbar>
-              </el-collapse-item>
-            </el-collapse>
+              </el-tab-pane>
+            </el-tabs>
           </div>
         </el-card>
 
@@ -86,6 +85,9 @@
       <!-- 中间画布区 -->
       <section class="canvas-area">
         <div ref="graphContainer" class="graph-container"></div>
+        <div v-if="!isGraphReady" class="loading-overlay">
+          <el-loading :fullscreen="false" text="加载中..."></el-loading>
+        </div>
       </section>
     </main>
 
@@ -106,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import * as LeaferUI from 'leafer-ui'
@@ -118,12 +120,13 @@ const graphContainer = ref<HTMLDivElement>()
 
 // 图实例
 let graph: Graph | null = null
+const isGraphReady = ref(false)
 
 // 状态
 const currentLayout = ref('force')
 const exportDialogVisible = ref(false)
 const exportedData = ref('')
-const activeNames = ref(['nodes'])
+const activeTab = ref('nodes')
 
 // 图数据
 const graphData = reactive<GraphData>({
@@ -153,25 +156,52 @@ const graphData = reactive<GraphData>({
 })
 
 // 初始化图
-onMounted(() => {
-  if (!graphContainer.value) return
-
-  graph = new Graph({
-    container: graphContainer.value,
+onMounted(async () => {
+  console.log('🚀 App mounted')
+  console.log('LeaferUI:', LeaferUI)
+  console.log('Graph:', Graph)
+  
+  await nextTick()
+  
+  if (!graphContainer.value) {
+    console.error('❌ graphContainer not found')
+    return
+  }
+  
+  console.log('📦 Container:', graphContainer.value)
+  console.log('📏 Container size:', {
     width: graphContainer.value.clientWidth,
-    height: graphContainer.value.clientHeight,
+    height: graphContainer.value.clientHeight
   })
-
-  // 传入 LeaferUI 模块并初始化
-  graph.init(LeaferUI)
   
-  // 设置数据
-  graph.setData(graphData)
-  
-  // 延迟应用布局
-  setTimeout(() => {
-    graph?.layout('force')
-  }, 100)
+  try {
+    graph = new Graph({
+      container: graphContainer.value,
+      width: graphContainer.value.clientWidth || 800,
+      height: graphContainer.value.clientHeight || 600,
+    })
+    
+    console.log('✅ Graph instance created:', graph)
+    
+    // 传入 LeaferUI 模块并初始化
+    graph.init(LeaferUI)
+    console.log('✅ Graph initialized with LeaferUI')
+    
+    // 设置数据
+    graph.setData({ ...graphData })
+    console.log('✅ Graph data set')
+    
+    // 延迟应用布局
+    setTimeout(() => {
+      graph?.layout('force')
+      console.log('✅ Layout applied')
+      isGraphReady.value = true
+    }, 200)
+    
+  } catch (error) {
+    console.error('❌ Error initializing graph:', error)
+    ElMessage.error('图谱初始化失败: ' + (error as Error).message)
+  }
 
   // 窗口大小调整
   window.addEventListener('resize', handleResize)
@@ -180,14 +210,28 @@ onMounted(() => {
 // 处理窗口调整
 const handleResize = () => {
   if (!graphContainer.value || !graph) return
+  
+  console.log('🔄 Window resized')
+  
+  // 更新画布大小
+  graph.options.width = graphContainer.value.clientWidth
+  graph.options.height = graphContainer.value.clientHeight
+  
+  // 重新适应视图
   graph.fitView()
 }
 
 // 切换布局
 const switchLayout = () => {
   if (!graph) return
-  graph.layout(currentLayout.value)
-  ElMessage.success(`已切换到${getLayoutName(currentLayout.value)}`)
+  
+  try {
+    graph.layout(currentLayout.value)
+    ElMessage.success(`已切换到${getLayoutName(currentLayout.value)}`)
+  } catch (error) {
+    console.error('❌ Layout error:', error)
+    ElMessage.error('布局切换失败')
+  }
 }
 
 // 获取布局名称
@@ -202,7 +246,10 @@ const getLayoutName = (type: string) => {
 
 // 添加随机节点
 const addRandomNode = () => {
-  if (!graph) return
+  if (!graph) {
+    ElMessage.warning('图谱未初始化')
+    return
+  }
   
   const id = String(Date.now())
   const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3']
@@ -220,11 +267,14 @@ const addRandomNode = () => {
     
     // 随机连接到现有节点
     if (graphData.nodes.length > 1) {
-      const randomTarget = graphData.nodes[Math.floor(Math.random() * (graphData.nodes.length - 1))].id
-      const newEdge = { source: id, target: randomTarget }
-      const edge = graph.addEdge(newEdge)
-      if (edge) {
-        graphData.edges.push(newEdge)
+      const targets = graphData.nodes.filter(n => n.id !== id)
+      const randomTarget = targets[Math.floor(Math.random() * targets.length)]?.id
+      if (randomTarget) {
+        const newEdge = { source: id, target: randomTarget }
+        const edge = graph.addEdge(newEdge)
+        if (edge) {
+          graphData.edges.push(newEdge)
+        }
       }
     }
     
@@ -238,33 +288,50 @@ const addRandomNode = () => {
 const removeNode = (nodeId: string) => {
   if (!graph) return
   
-  graph.removeNode(nodeId)
-  
-  // 更新数据
-  const nodeIndex = graphData.nodes.findIndex(n => n.id === nodeId)
-  if (nodeIndex > -1) {
-    graphData.nodes.splice(nodeIndex, 1)
+  try {
+    graph.removeNode(nodeId)
+    
+    // 更新数据
+    const nodeIndex = graphData.nodes.findIndex(n => n.id === nodeId)
+    if (nodeIndex > -1) {
+      graphData.nodes.splice(nodeIndex, 1)
+    }
+    
+    // 移除相关边
+    graphData.edges = graphData.edges.filter(e => e.source !== nodeId && e.target !== nodeId)
+    
+    ElMessage.success('删除节点成功')
+  } catch (error) {
+    console.error('❌ Remove node error:', error)
+    ElMessage.error('删除节点失败')
   }
-  
-  // 移除相关边
-  graphData.edges = graphData.edges.filter(e => e.source !== nodeId && e.target !== nodeId)
-  
-  ElMessage.success('删除节点成功')
 }
 
 // 导出数据
 const exportData = () => {
-  if (!graph) return
+  if (!graph) {
+    ElMessage.warning('图谱未初始化')
+    return
+  }
   
-  const data = graph.getData()
-  exportedData.value = JSON.stringify(data, null, 2)
-  exportDialogVisible.value = true
+  try {
+    const data = graph.getData()
+    exportedData.value = JSON.stringify(data, null, 2)
+    exportDialogVisible.value = true
+  } catch (error) {
+    console.error('❌ Export error:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 // 复制到剪贴板
 const copyToClipboard = () => {
-  navigator.clipboard.writeText(exportedData.value)
-  ElMessage.success('已复制到剪贴板')
+  navigator.clipboard.writeText(exportedData.value).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  }).catch(err => {
+    console.error('❌ Copy error:', err)
+    ElMessage.error('复制失败')
+  })
 }
 </script>
 
@@ -337,6 +404,7 @@ const copyToClipboard = () => {
   flex: 1;
   padding: 16px;
   overflow: hidden;
+  position: relative;
 }
 
 .graph-container {
@@ -345,6 +413,19 @@ const copyToClipboard = () => {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
 }
 
 .mt-4 {
