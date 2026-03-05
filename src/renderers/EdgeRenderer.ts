@@ -2,7 +2,7 @@ import type { Edge } from '../core/Edge'
 import type { EdgeStyle } from '../types'
 
 /**
- * 边渲染器 - 负责将 Edge 对象渲染为 Leafer 图形
+ * 边渲染器
  */
 export class EdgeRenderer {
   private edgeMap = new Map<string, any>()
@@ -21,7 +21,10 @@ export class EdgeRenderer {
     if (existing) return existing
 
     const endpoints = edge.getEndpoints()
-    if (!endpoints) return null
+    if (!endpoints) {
+      console.warn('Edge has no endpoints:', edge.id)
+      return null
+    }
 
     const { x1, y1, x2, y2 } = endpoints
     const style = edge.style || {}
@@ -106,7 +109,7 @@ export class EdgeRenderer {
   ): any | null {
     const commonProps = {
       stroke: style.stroke || '#999',
-      strokeWidth: style.lineWidth || 1,
+      strokeWidth: style.lineWidth || 1.5,
     }
 
     switch (type) {
@@ -128,19 +131,7 @@ export class EdgeRenderer {
     y2: number,
     props: any
   ): any | null {
-    // 尝试使用 Line
-    const Line = this.LeaferUI.Line
-    if (Line) {
-      return new Line({
-        ...props,
-        x: x1,
-        y: y1,
-        toX: x2 - x1,
-        toY: y2 - y1,
-      })
-    }
-
-    // 备用：使用 Path
+    // 使用 Path 绘制直线
     const Path = this.LeaferUI.Path
     if (Path) {
       return new Path({
@@ -149,7 +140,7 @@ export class EdgeRenderer {
       })
     }
 
-    console.warn('Neither Line nor Path found in LeaferUI')
+    console.warn('Path not found in LeaferUI')
     return null
   }
 
@@ -165,12 +156,11 @@ export class EdgeRenderer {
   ): any | null {
     const Path = this.LeaferUI.Path
     if (!Path) {
-      console.warn('Path not found, falling back to line')
       return this.createLine(x1, y1, x2, y2, props)
     }
 
     const midX = (x1 + x2) / 2
-    const midY = (y1 + y2) / 2 - 50 // 控制点偏移
+    const midY = (y1 + y2) / 2 - 50
 
     return new Path({
       ...props,
@@ -209,21 +199,11 @@ export class EdgeRenderer {
     x2: number,
     y2: number
   ): void {
-    // 尝试检测类型并更新
-    if (line.set) {
-      line.set({ x: x1, y: y1 })
-      
-      // 如果有 toX/toY 属性，更新它们
-      if (line.toX !== undefined) {
-        line.set({ toX: x2 - x1, toY: y2 - y1 })
-      }
-      
-      // 如果有 path 属性，更新路径
-      if (line.path !== undefined) {
-        const midX = (x1 + x2) / 2
-        const midY = (y1 + y2) / 2 - 50
-        line.set({ path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}` })
-      }
+    if (!line.set) return
+
+    // 更新路径
+    if (line.path !== undefined) {
+      line.set({ path: `M ${x1} ${y1} L ${x2} ${y2}` })
     }
   }
 
@@ -232,7 +212,7 @@ export class EdgeRenderer {
    */
   private updateLabelPosition(label: any, x1: number, y1: number, x2: number, y2: number): void {
     if (!label.set) return
-    
+
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
     label.set({ x: midX, y: midY - 10 })

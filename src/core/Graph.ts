@@ -125,20 +125,24 @@ export class Graph {
 
     this.clearData()
 
-    // 创建节点
+    // 先创建节点（不渲染）
     data.nodes.forEach(nodeData => {
       const node = new Node(nodeData)
       this.nodes.set(node.id, node)
-      this.renderNode(node)
     })
 
-    // 创建边
+    // 绑定边到节点
     data.edges?.forEach(edgeData => {
       const edge = new Edge(edgeData)
       edge.bindNodes(this.nodes)
       this.edges.push(edge)
-      this.renderEdge(edge)
     })
+
+    // 先渲染边（在底层）
+    this.edges.forEach(edge => this.renderEdge(edge))
+
+    // 再渲染节点（在顶层）
+    this.nodes.forEach(node => this.renderNode(node))
 
     this.emit('afterrender', { type: 'afterrender' })
 
