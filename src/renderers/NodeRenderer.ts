@@ -3,10 +3,6 @@ import type { NodeStyle } from '../types'
 
 /**
  * 节点渲染器 - 负责将 Node 对象渲染为 Leafer 图形
- * 
- * 设计原则 (frontend-design):
- * - 单一职责：只负责节点渲染
- * - 展示组件：纯渲染，无业务逻辑
  */
 export class NodeRenderer {
   private nodeMap = new Map<string, any>()
@@ -14,38 +10,49 @@ export class NodeRenderer {
 
   constructor(leaferUI: any) {
     this.LeaferUI = leaferUI
+    console.log('NodeRenderer initialized with:', Object.keys(leaferUI))
   }
 
   /**
    * 创建 Leafer 节点
-   * 应用 simplify 技能：提前返回，减少嵌套
    */
   create(node: Node): any {
     const existing = this.nodeMap.get(node.id)
     if (existing) return existing
 
-    const shape = this.createShape(node)
-    const label = this.createLabel(node)
+    try {
+      const shape = this.createShape(node)
+      const label = this.createLabel(node)
 
-    const container = new this.LeaferUI.Box({
-      x: node.x,
-      y: node.y,
-      children: label ? [shape, label] : [shape],
-      draggable: true,
-      data: { nodeId: node.id },
-    })
+      // 使用 Box 作为容器
+      const Box = this.LeaferUI.Box || this.LeaferUI.Leafer?.Box
+      if (!Box) {
+        console.error('Box not found in LeaferUI:', this.LeaferUI)
+        throw new Error('Box component not found')
+      }
 
-    this.nodeMap.set(node.id, container)
-    return container
+      const container = new Box({
+        x: node.x,
+        y: node.y,
+        children: label ? [shape, label] : [shape],
+        draggable: true,
+        data: { nodeId: node.id },
+      })
+
+      this.nodeMap.set(node.id, container)
+      return container
+    } catch (error) {
+      console.error('Error creating node:', error)
+      throw error
+    }
   }
 
   /**
-   * 更新节点位置和样式
+   * 更新节点位置
    */
   update(node: Node): void {
     const box = this.nodeMap.get(node.id)
     if (!box) return
-
     box.set({ x: node.x, y: node.y })
   }
 
@@ -55,16 +62,8 @@ export class NodeRenderer {
   remove(nodeId: string): void {
     const box = this.nodeMap.get(nodeId)
     if (!box) return
-
     box.remove()
     this.nodeMap.delete(nodeId)
-  }
-
-  /**
-   * 获取 Leafer 节点
-   */
-  get(nodeId: string): any | undefined {
-    return this.nodeMap.get(nodeId)
   }
 
   /**
@@ -76,7 +75,7 @@ export class NodeRenderer {
   }
 
   /**
-   * 创建形状 - 单一职责，一个函数只做一件事 (simplify)
+   * 创建形状
    */
   private createShape(node: Node): any {
     const style = node.style || {}
@@ -89,23 +88,37 @@ export class NodeRenderer {
       fill: style.fill || '#1890ff',
       stroke: style.stroke || '#096dd9',
       strokeWidth: style.lineWidth || 2,
-      opacity: style.opacity ?? 1,
     }
 
-    // 使用 this.LeaferUI 访问组件
+    // 获取组件构造函数
+    const Circle = this.LeaferUI.Circle
+    const Rect = this.LeaferUI.Rect
+    const Ellipse = this.LeaferUI.Ellipse
+
+    console.log('Available components:', { Circle, Rect, Ellipse })
+
+    let shape
     switch (shapeType) {
       case 'circle':
-        return new this.LeaferUI.Circle({
+        if (!Circle) throw new Error('Circle component not found in LeaferUI')
+        shape = new Circle({
           ...commonProps,
           width: size.width,
           height: size.height,
         })
+        break
       case 'ellipse':
-        return new this.LeaferUI.Ellipse(commonProps)
+        if (!Ellipse) throw new Error('Ellipse component not found in LeaferUI')
+        shape = new Ellipse(commonProps)
+        break
       case 'rect':
       default:
-        return new this.LeaferUI.Rect(commonProps)
+        if (!Rect) throw new Error('Rect component not found in LeaferUI')
+        shape = new Rect(commonProps)
+        break
     }
+    
+    return shape
   }
 
   /**
@@ -114,15 +127,19 @@ export class NodeRenderer {
   private createLabel(node: Node): any | null {
     if (!node.label) return null
 
+    const Text = this.LeaferUI.Text
+    if (!Text) {
+      console.warn('Text component not found in LeaferUI')
+      return null
+    }
+
     const labelStyle = node.style?.label || {}
     const size = this.normalizeSize(node.style?.size)
 
-    return new this.LeaferUI.Text({
+    return new Text({
       text: node.label,
       fill: labelStyle.fill || '#333',
       fontSize: labelStyle.fontSize || 14,
-      fontFamily: labelStyle.fontFamily || 'sans-serif',
-      fontWeight: labelStyle.fontWeight || 'normal',
       textAlign: 'center',
       verticalAlign: 'middle',
       x: 0,
