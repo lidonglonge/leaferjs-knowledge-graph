@@ -8,9 +8,9 @@
       
       <div class="toolbar-center">
         <el-radio-group v-model="currentLayout" @change="switchLayout">
-          <el-radio-button label="force">力导向布局</el-radio-button>
-          <el-radio-button label="circular">环形布局</el-radio-button>
-          <el-radio-button label="grid">网格布局</el-radio-button>
+          <el-radio-button value="force">力导向布局</el-radio-button>
+          <el-radio-button value="circular">环形布局</el-radio-button>
+          <el-radio-button value="grid">网格布局</el-radio-button>
         </el-radio-group>
       </div>
       
@@ -84,9 +84,18 @@
 
       <!-- 中间画布区 -->
       <section class="canvas-area">
-        <div ref="graphContainer" class="graph-container"></div>
-        <div v-if="!isGraphReady" class="loading-overlay">
-          <el-loading :fullscreen="false" text="加载中..."></el-loading>
+        <div ref="graphContainer" class="graph-container">
+          <!-- 加载提示 -->
+          <div v-if="!isGraphReady" class="loading-overlay">
+            <div class="loading-spinner">🔄 加载中...</div>
+          </div>
+          <!-- 错误提示 -->
+          <div v-if="errorMessage" class="error-overlay">
+            <div class="error-message">
+              <div>❌ {{ errorMessage }}</div>
+              <el-button @click="retryInit" class="mt-2">重试</el-button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -121,6 +130,7 @@ const graphContainer = ref<HTMLDivElement>()
 // 图实例
 let graph: Graph | null = null
 const isGraphReady = ref(false)
+const errorMessage = ref('')
 
 // 状态
 const currentLayout = ref('force')
@@ -155,16 +165,23 @@ const graphData = reactive<GraphData>({
   ]
 })
 
-// 初始化图
-onMounted(async () => {
+// 重试初始化
+const retryInit = () => {
+  errorMessage.value = ''
+  isGraphReady.value = false
+  initGraph()
+}
+
+// 初始化图谱
+const initGraph = async () => {
   console.log('🚀 App mounted')
-  console.log('LeaferUI:', LeaferUI)
-  console.log('Graph:', Graph)
+  console.log('LeaferUI keys:', Object.keys(LeaferUI).slice(0, 20))
   
   await nextTick()
   
   if (!graphContainer.value) {
     console.error('❌ graphContainer not found')
+    errorMessage.value = '容器未找到'
     return
   }
   
@@ -181,37 +198,50 @@ onMounted(async () => {
       height: graphContainer.value.clientHeight || 600,
     })
     
-    console.log('✅ Graph instance created:', graph)
+    console.log('✅ Graph instance created')
     
     // 传入 LeaferUI 模块并初始化
     graph.init(LeaferUI)
     console.log('✅ Graph initialized with LeaferUI')
     
+    // 检查 canvasLayer 是否创建成功
+    console.log('Canvas layer:', (graph as any).canvasLayer)
+    console.log('App:', (graph as any).app)
+    
     // 设置数据
-    graph.setData({ ...graphData })
+    const dataToSet = { ...graphData }
+    console.log('Setting data:', dataToSet)
+    graph.setData(dataToSet)
     console.log('✅ Graph data set')
     
     // 延迟应用布局
     setTimeout(() => {
-      graph?.layout('force')
-      console.log('✅ Layout applied')
-      isGraphReady.value = true
-    }, 200)
+      try {
+        console.log('Applying layout...')
+        graph?.layout('force')
+        console.log('✅ Layout applied')
+        isGraphReady.value = true
+      } catch (layoutError) {
+        console.error('❌ Layout error:', layoutError)
+        errorMessage.value = '布局计算失败'
+      }
+    }, 500)
     
   } catch (error) {
     console.error('❌ Error initializing graph:', error)
-    ElMessage.error('图谱初始化失败: ' + (error as Error).message)
+    errorMessage.value = '图谱初始化失败: ' + (error as Error).message
   }
+}
 
-  // 窗口大小调整
+// 初始化
+onMounted(() => {
+  initGraph()
   window.addEventListener('resize', handleResize)
 })
 
 // 处理窗口调整
 const handleResize = () => {
   if (!graphContainer.value || !graph) return
-  
-  console.log('🔄 Window resized')
   
   // 更新画布大小
   graph.options.width = graphContainer.value.clientWidth
@@ -226,6 +256,7 @@ const switchLayout = () => {
   if (!graph) return
   
   try {
+    console.log('Switching layout to:', currentLayout.value)
     graph.layout(currentLayout.value)
     ElMessage.success(`已切换到${getLayoutName(currentLayout.value)}`)
   } catch (error) {
@@ -413,19 +444,50 @@ const copyToClipboard = () => {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .loading-overlay {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  background: rgba(255, 255, 255, 0.8);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  z-index: 10;
+}
+
+.loading-spinner {
+  font-size: 18px;
+  color: #409eff;
+}
+
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  z-index: 20;
+}
+
+.error-message {
+  text-align: center;
+  color: #f56c6c;
+  font-size: 16px;
+}
+
+.mt-2 {
+  margin-top: 8px;
 }
 
 .mt-4 {
