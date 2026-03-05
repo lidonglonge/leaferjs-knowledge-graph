@@ -32,16 +32,14 @@ export class EdgeRenderer {
     const style = edge.style || {}
     const edgeType = style.type || 'line'
 
-    const { Line, Path } = this.LeaferUI
-    const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style, { Line, Path })
+    const line = this.createEdgeElement(x1, y1, x2, y2, edgeType, style)
     if (!line) return null
 
     this.edgeMap.set(edge.id, line)
 
     // 创建标签
     if (edge.label) {
-      const { Text } = this.LeaferUI
-      const label = this.createLabel(edge, x1, y1, x2, y2, Text)
+      const label = this.createLabel(edge, x1, y1, x2, y2)
       if (label) this.labelMap.set(edge.id, label)
     }
 
@@ -105,10 +103,8 @@ export class EdgeRenderer {
     x2: number,
     y2: number,
     type: EdgeStyle['type'],
-    style: EdgeStyle,
-    components: { Line: any; Path: any }
+    style: EdgeStyle
   ): any | null {
-    const { Line, Path } = components
     const commonProps = {
       stroke: style.stroke || '#999',
       strokeWidth: style.lineWidth || 1,
@@ -118,10 +114,10 @@ export class EdgeRenderer {
 
     switch (type) {
       case 'curve':
-        return this.createCurve(x1, y1, x2, y2, commonProps, Path)
+        return this.createCurve(x1, y1, x2, y2, commonProps)
       case 'line':
       default:
-        return new Line({
+        return new this.LeaferUI.Line({
           ...commonProps,
           x: x1,
           y: y1,
@@ -139,13 +135,12 @@ export class EdgeRenderer {
     y1: number,
     x2: number,
     y2: number,
-    props: Record<string, unknown>,
-    Path: any
+    props: Record<string, unknown>
   ): any {
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2 - 50 // 控制点偏移
 
-    return new Path({
+    return new this.LeaferUI.Path({
       ...props,
       path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`,
     })
@@ -154,19 +149,12 @@ export class EdgeRenderer {
   /**
    * 创建标签
    */
-  private createLabel(
-    edge: Edge, 
-    x1: number, 
-    y1: number, 
-    x2: number, 
-    y2: number,
-    Text: any
-  ): any {
+  private createLabel(edge: Edge, x1: number, y1: number, x2: number, y2: number): any {
     const labelStyle = edge.style?.label || {}
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2
 
-    return new Text({
+    return new this.LeaferUI.Text({
       text: edge.label,
       fill: labelStyle.fill || '#666',
       fontSize: labelStyle.fontSize || 12,
@@ -186,10 +174,9 @@ export class EdgeRenderer {
     x2: number,
     y2: number
   ): void {
-    const lineType = line.constructor.name
-    if (lineType === 'Line') {
+    if (line instanceof this.LeaferUI.Line) {
       line.set({ x: x1, y: y1, toX: x2 - x1, toY: y2 - y1 })
-    } else if (lineType === 'Path') {
+    } else if (line instanceof this.LeaferUI.Path) {
       const midX = (x1 + x2) / 2
       const midY = (y1 + y2) / 2 - 50
       line.set({ path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}` })

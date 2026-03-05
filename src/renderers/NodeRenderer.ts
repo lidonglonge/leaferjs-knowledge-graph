@@ -24,12 +24,10 @@ export class NodeRenderer {
     const existing = this.nodeMap.get(node.id)
     if (existing) return existing
 
-    const { Box, Circle, Rect, Ellipse, Text } = this.LeaferUI
-    
-    const shape = this.createShape(node, { Circle, Rect, Ellipse })
-    const label = this.createLabel(node, Text)
+    const shape = this.createShape(node)
+    const label = this.createLabel(node)
 
-    const container = new Box({
+    const container = new this.LeaferUI.Box({
       x: node.x,
       y: node.y,
       children: label ? [shape, label] : [shape],
@@ -80,11 +78,7 @@ export class NodeRenderer {
   /**
    * 创建形状 - 单一职责，一个函数只做一件事 (simplify)
    */
-  private createShape(
-    node: Node, 
-    components: { Circle: any; Rect: any; Ellipse: any }
-  ): any {
-    const { Circle, Rect, Ellipse } = components
+  private createShape(node: Node): any {
     const style = node.style || {}
     const size = this.normalizeSize(style.size)
     const shapeType = style.shape || 'circle'
@@ -98,31 +92,32 @@ export class NodeRenderer {
       opacity: style.opacity ?? 1,
     }
 
+    // 使用 this.LeaferUI 访问组件
     switch (shapeType) {
       case 'circle':
-        return new Circle({
+        return new this.LeaferUI.Circle({
           ...commonProps,
           width: size.width,
           height: size.height,
         })
       case 'ellipse':
-        return new Ellipse(commonProps)
+        return new this.LeaferUI.Ellipse(commonProps)
       case 'rect':
       default:
-        return new Rect(commonProps)
+        return new this.LeaferUI.Rect(commonProps)
     }
   }
 
   /**
    * 创建标签
    */
-  private createLabel(node: Node, Text: any): any | null {
+  private createLabel(node: Node): any | null {
     if (!node.label) return null
 
     const labelStyle = node.style?.label || {}
     const size = this.normalizeSize(node.style?.size)
 
-    return new Text({
+    return new this.LeaferUI.Text({
       text: node.label,
       fill: labelStyle.fill || '#333',
       fontSize: labelStyle.fontSize || 14,
