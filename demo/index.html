@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeaferJS Knowledge Graph Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+    }
+    #container {
+      width: 100vw;
+      height: 100vh;
+      background: #fff;
+    }
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      background: #1890ff;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #40a9ff;
+    }
+    .info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="applyLayout('force')">力导向布局</button>
+    <button onclick="applyLayout('circular')">环形布局</button>
+    <button onclick="applyLayout('grid')">网格布局</button>
+  </div>
+  
+  <div id="container"></div>
+  
+  <div class="info">
+    LeaferJS Knowledge Graph Demo - 点击按钮切换布局
+  </div>
+
+  <script type="module">
+    // Demo 数据
+    const data = {
+      nodes: [
+        { id: '1', label: '中心节点' },
+        { id: '2', label: '节点 2' },
+        { id: '3', label: '节点 3' },
+        { id: '4', label: '节点 4' },
+        { id: '5', label: '节点 5' },
+        { id: '6', label: '节点 6' },
+        { id: '7', label: '节点 7' },
+        { id: '8', label: '节点 8' },
+        { id: '9', label: '节点 9' },
+        { id: '10', label: '节点 10' },
+        { id: '11', label: '节点 11' },
+        { id: '12', label: '节点 12' }
+      ],
+      edges: [
+        { source: '1', target: '2' },
+        { source: '1', target: '3' },
+        { source: '1', target: '4' },
+        { source: '1', target: '5' },
+        { source: '2', target: '6' },
+        { source: '2', target: '7' },
+        { source: '3', target: '8' },
+        { source: '3', target: '9' },
+        { source: '4', target: '10' },
+        { source: '4', target: '11' },
+        { source: '5', target: '12' }
+      ]
+    }
+
+    // 全局函数供按钮调用
+    window.applyLayout = (type) => {
+      console.log('Applying layout:', type)
+      // 这里将调用 Graph 实例的布局方法
+    }
+
+    console.log('Demo loaded with data:', data)
+    console.log('Graph package:', 'leaferjs-knowledge-graph v0.1.0')
+  </script>
+</body>
+</html>
