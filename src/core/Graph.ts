@@ -1,10 +1,9 @@
-import { App, Leafer, Box } from 'leafer-ui'
+import { App, Leafer, Box } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type {
   GraphOptions,
   GraphData,
   NodeData,
   EdgeData,
-  LayoutOptions,
   GraphEventType,
   GraphEventCallback,
   GraphEvent,

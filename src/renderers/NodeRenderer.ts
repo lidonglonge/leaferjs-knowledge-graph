@@ -1,4 +1,4 @@
-import { Box, Rect, Circle, Ellipse, Text } from 'leafer-ui'
+import { Box, Rect, Circle, Ellipse, Text } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type { Node } from '../core/Node'
 import type { NodeStyle } from '../types'
 
@@ -43,7 +43,6 @@ export class NodeRenderer {
     if (!box) return
 
     box.set({ x: node.x, y: node.y })
-    this.updateStyle(box, node)
   }
 
   /**
@@ -124,21 +123,6 @@ export class NodeRenderer {
       x: 0,
       y: size.height / 2 - 7,
       width: size.width,
-    })
-  }
-
-  /**
-   * 更新样式
-   */
-  private updateStyle(box: Box, node: Node): void {
-    // 后续实现样式更新动画
-    const shape = box.children?.[0]
-    if (!shape) return
-
-    const style = node.style || {}
-    shape.set({
-      fill: style.fill,
-      stroke: style.stroke,
     })
   }
 

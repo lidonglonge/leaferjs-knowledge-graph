@@ -1,4 +1,4 @@
-import { Line, Path, Text } from 'leafer-ui'
+import { Line, Path, Text } from 'leafer-ui/dist/leafer-ui.esm.js'
 import type { Edge } from '../core/Edge'
 import type { EdgeStyle } from '../types'
 
