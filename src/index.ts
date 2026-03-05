@@ -3,6 +3,12 @@ export { Graph } from './core/Graph'
 export { Node } from './core/Node'
 export { Edge } from './core/Edge'
 
+// 渲染器
+export { NodeRenderer, EdgeRenderer } from './renderers'
+
+// 布局
+export { ForceLayout, CircularLayout, GridLayout } from './layouts'
+
 // 类型定义
 export type {
   NodeData,
@@ -17,7 +23,7 @@ export type {
   GraphEventType,
   GraphEventCallback,
   GraphEvent,
-  LayoutResult
+  LayoutResult,
 } from './types'
 
 // 版本号

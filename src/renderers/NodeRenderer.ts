@@ -1,0 +1,154 @@
+import { Box, Rect, Circle, Ellipse, Text } from 'leafer-ui'
+import type { Node } from '../core/Node'
+import type { NodeStyle } from '../types'
+
+/**
+ * 节点渲染器 - 负责将 Node 对象渲染为 Leafer 图形
+ * 
+ * 设计原则 (frontend-design):
+ * - 单一职责：只负责节点渲染
+ * - 展示组件：纯渲染，无业务逻辑
+ */
+export class NodeRenderer {
+  private nodeMap = new Map<string, Box>()
+
+  /**
+   * 创建 Leafer 节点
+   * 应用 simplify 技能：提前返回，减少嵌套
+   */
+  create(node: Node): Box {
+    const existing = this.nodeMap.get(node.id)
+    if (existing) return existing
+
+    const shape = this.createShape(node)
+    const label = this.createLabel(node)
+
+    const container = new Box({
+      x: node.x,
+      y: node.y,
+      children: label ? [shape, label] : [shape],
+      draggable: true,
+      data: { nodeId: node.id },
+    })
+
+    this.nodeMap.set(node.id, container)
+    return container
+  }
+
+  /**
+   * 更新节点位置和样式
+   */
+  update(node: Node): void {
+    const box = this.nodeMap.get(node.id)
+    if (!box) return
+
+    box.set({ x: node.x, y: node.y })
+    this.updateStyle(box, node)
+  }
+
+  /**
+   * 删除节点
+   */
+  remove(nodeId: string): void {
+    const box = this.nodeMap.get(nodeId)
+    if (!box) return
+
+    box.remove()
+    this.nodeMap.delete(nodeId)
+  }
+
+  /**
+   * 获取 Leafer 节点
+   */
+  get(nodeId: string): Box | undefined {
+    return this.nodeMap.get(nodeId)
+  }
+
+  /**
+   * 清空所有节点
+   */
+  clear(): void {
+    this.nodeMap.forEach(box => box.remove())
+    this.nodeMap.clear()
+  }
+
+  /**
+   * 创建形状 - 单一职责，一个函数只做一件事 (simplify)
+   */
+  private createShape(node: Node): Rect | Circle | Ellipse {
+    const style = node.style || {}
+    const size = this.normalizeSize(style.size)
+    const shapeType = style.shape || 'circle'
+
+    const commonProps = {
+      width: size.width,
+      height: size.height,
+      fill: style.fill || '#1890ff',
+      stroke: style.stroke || '#096dd9',
+      strokeWidth: style.lineWidth || 2,
+      opacity: style.opacity ?? 1,
+    }
+
+    switch (shapeType) {
+      case 'circle':
+        return new Circle({
+          ...commonProps,
+          width: size.width,
+          height: size.height,
+        })
+      case 'ellipse':
+        return new Ellipse(commonProps)
+      case 'rect':
+      default:
+        return new Rect(commonProps)
+    }
+  }
+
+  /**
+   * 创建标签
+   */
+  private createLabel(node: Node): Text | null {
+    if (!node.label) return null
+
+    const labelStyle = node.style?.label || {}
+    const size = this.normalizeSize(node.style?.size)
+
+    return new Text({
+      text: node.label,
+      fill: labelStyle.fill || '#333',
+      fontSize: labelStyle.fontSize || 14,
+      fontFamily: labelStyle.fontFamily || 'sans-serif',
+      fontWeight: labelStyle.fontWeight || 'normal',
+      textAlign: 'center',
+      verticalAlign: 'middle',
+      x: 0,
+      y: size.height / 2 - 7,
+      width: size.width,
+    })
+  }
+
+  /**
+   * 更新样式
+   */
+  private updateStyle(box: Box, node: Node): void {
+    // 后续实现样式更新动画
+    const shape = box.children?.[0]
+    if (!shape) return
+
+    const style = node.style || {}
+    shape.set({
+      fill: style.fill,
+      stroke: style.stroke,
+    })
+  }
+
+  /**
+   * 统一尺寸格式
+   */
+  private normalizeSize(size: NodeStyle['size']): { width: number; height: number } {
+    const defaultSize = 60
+    if (!size) return { width: defaultSize, height: defaultSize }
+    if (Array.isArray(size)) return { width: size[0], height: size[1] }
+    return { width: size, height: size }
+  }
+}

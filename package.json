@@ -38,8 +38,9 @@
   },
   "homepage": "https://github.com/lidonglonge/leaferjs-knowledge-graph#readme",
   "peerDependencies": {
-    "leafer-ui": "^1.0.0"
+    "leafer-ui": "^1.0.2"
   },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
