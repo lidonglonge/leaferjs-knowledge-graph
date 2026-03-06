@@ -126,7 +126,6 @@ import { ref, onMounted, reactive, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import * as LeaferUI from 'leafer-ui'
-import { Arrow } from '@leafer-in/arrow'
 import { Graph } from 'leaferjs-knowledge-graph'
 import type { GraphData } from 'leaferjs-knowledge-graph'
 
@@ -206,9 +205,9 @@ const initGraph = async () => {
     
     console.log('✅ Graph instance created')
     
-    // 传入 LeaferUI 模块和箭头插件并初始化
-    graph.init(LeaferUI, Arrow)
-    console.log('✅ Graph initialized with LeaferUI and Arrow plugin')
+    // 传入 LeaferUI 模块并初始化
+    graph.init(LeaferUI)
+    console.log('✅ Graph initialized with LeaferUI')
     
     // 检查 canvasLayer 是否创建成功
     console.log('Canvas layer:', (graph as any).canvasLayer)

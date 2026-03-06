@@ -62,7 +62,7 @@ export class Graph {
    * 初始化 Leafer 画布
    * 需要在运行时传入 LeaferUI 模块
    */
-  init(leaferUIModule: any, arrowPlugin?: any): void {
+  init(leaferUIModule: any): void {
     if (!leaferUIModule) {
       console.error('LeaferUI module is required')
       return
@@ -73,7 +73,7 @@ export class Graph {
     
     // 创建渲染器，传入拖拽回调
     this.nodeRenderer = new NodeRenderer(leaferUIModule, this.handleNodeDrag.bind(this))
-    this.edgeRenderer = new EdgeRenderer(leaferUIModule, arrowPlugin)
+    this.edgeRenderer = new EdgeRenderer(leaferUIModule)
   }
 
   /**
@@ -101,20 +101,25 @@ export class Graph {
   private initLeafer(): void {
     const { App, Leafer } = this.LeaferUI
     const container = this.getContainer()
-    
+
     if (!container) {
       console.error('Graph container not found')
       return
     }
 
-    this.app = new App({
-      view: container,
-      width: this.options.width,
-      height: this.options.height,
-    })
+    try {
+      this.app = new App({
+        view: container,
+        width: this.options.width,
+        height: this.options.height,
+      })
 
-    this.canvasLayer = new Leafer()
-    this.app.add(this.canvasLayer)
+      this.canvasLayer = new Leafer()
+      this.app.add(this.canvasLayer)
+    } catch (error) {
+      console.error('Error creating Leafer App:', error)
+      throw error
+    }
   }
 
   /**
