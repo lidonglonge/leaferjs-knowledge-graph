@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
+    "@leafer/canvas-web": "^2.0.2",
     "element-plus": "^2.5.0",
     "leafer-ui": "^1.0.2",
     "vue": "^3.4.0"

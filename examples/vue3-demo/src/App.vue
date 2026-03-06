@@ -126,6 +126,7 @@ import { ref, onMounted, reactive, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import * as LeaferUI from 'leafer-ui'
+import '@leafer/canvas-web'
 import { Graph } from 'leaferjs-knowledge-graph'
 import type { GraphData } from 'leaferjs-knowledge-graph'
 
