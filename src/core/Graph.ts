@@ -15,16 +15,6 @@ import { ForceLayout, CircularLayout, GridLayout } from '../layouts'
 
 /**
  * 图类 - 知识图谱主类
- * 
- * 架构设计 (frontend-design):
- * - 容器组件：负责数据管理和协调
- * - 渲染分离：渲染逻辑委托给 Renderer
- * - 模块化：布局、渲染、事件分离
- * 
- * 代码风格 (simplify):
- * - 提前返回减少嵌套
- * - 单一职责函数
- * - 清晰命名
  */
 export class Graph {
   options: Required<GraphOptions>
@@ -32,8 +22,7 @@ export class Graph {
   edges: Edge[] = []
 
   // Leafer 实例
-  private app: any = null
-  private canvasLayer: any = null
+  private leafer: any = null
   private LeaferUI: any = null
 
   // 渲染器
@@ -60,7 +49,6 @@ export class Graph {
 
   /**
    * 初始化 Leafer 画布
-   * 需要在运行时传入 LeaferUI 模块
    */
   init(leaferUIModule: any): void {
     if (!leaferUIModule) {
@@ -69,55 +57,32 @@ export class Graph {
     }
 
     this.LeaferUI = leaferUIModule
-    this.initLeafer()
     
-    // 创建渲染器，传入拖拽回调
-    this.nodeRenderer = new NodeRenderer(leaferUIModule, this.handleNodeDrag.bind(this))
-    this.edgeRenderer = new EdgeRenderer(leaferUIModule)
-  }
-
-  /**
-   * 处理节点拖拽事件
-   */
-  private handleNodeDrag(nodeId: string, x: number, y: number): void {
-    const node = this.nodes.get(nodeId)
-    if (!node) return
-
-    // 更新节点数据
-    node.setPosition(x, y)
-
-    // 更新所有与该节点相关的边
-    this.edges.forEach(edge => {
-      if (edge.source === nodeId || edge.target === nodeId) {
-        this.edgeRenderer?.update(edge)
-      }
-    })
-  }
-
-  /**
-   * 初始化 Leafer 画布
-   * 单一职责：只负责初始化
-   */
-  private initLeafer(): void {
-    const { App, Leafer } = this.LeaferUI
     const container = this.getContainer()
-
     if (!container) {
       console.error('Graph container not found')
       return
     }
 
     try {
-      this.app = new App({
+      // 使用 Leafer 作为主画布
+      const { Leafer } = leaferUIModule
+      
+      this.leafer = new Leafer({
         view: container,
         width: this.options.width,
         height: this.options.height,
       })
 
-      this.canvasLayer = new Leafer()
-      this.app.add(this.canvasLayer)
+      console.log('✅ Leafer canvas created')
+      
+      // 创建渲染器
+      this.nodeRenderer = new NodeRenderer(leaferUIModule, this.handleNodeDrag.bind(this))
+      this.edgeRenderer = new EdgeRenderer(leaferUIModule)
+      
+      console.log('✅ Renderers created')
     } catch (error) {
-      console.error('Error creating Leafer App:', error)
+      console.error('❌ Error creating Leafer:', error)
       throw error
     }
   }
@@ -134,8 +99,24 @@ export class Graph {
   }
 
   /**
+   * 处理节点拖拽事件
+   */
+  private handleNodeDrag(nodeId: string, x: number, y: number): void {
+    const node = this.nodes.get(nodeId)
+    if (!node) return
+
+    node.setPosition(x, y)
+
+    // 更新所有与该节点相关的边
+    this.edges.forEach(edge => {
+      if (edge.source === nodeId || edge.target === nodeId) {
+        this.edgeRenderer?.update(edge)
+      }
+    })
+  }
+
+  /**
    * 设置图数据
-   * 应用 simplify：减少嵌套，提前返回
    */
   setData(data: GraphData): void {
     if (!data?.nodes?.length) {
@@ -143,20 +124,20 @@ export class Graph {
       return
     }
 
-    if (!this.nodeRenderer || !this.edgeRenderer) {
+    if (!this.nodeRenderer || !this.edgeRenderer || !this.leafer) {
       console.error('Graph not initialized. Call init() first.')
       return
     }
 
     this.clearData()
 
-    // 先创建节点（不渲染）
+    // 先创建节点
     data.nodes.forEach(nodeData => {
       const node = new Node(nodeData)
       this.nodes.set(node.id, node)
     })
 
-    // 绑定边到节点
+    // 创建边并绑定节点
     data.edges?.forEach(edgeData => {
       const edge = new Edge(edgeData)
       edge.bindNodes(this.nodes)
@@ -204,7 +185,7 @@ export class Graph {
    * 添加节点
    */
   addNode(data: NodeData): Node | null {
-    if (!this.nodeRenderer) {
+    if (!this.nodeRenderer || !this.leafer) {
       console.error('Graph not initialized')
       return null
     }
@@ -241,7 +222,7 @@ export class Graph {
    * 添加边
    */
   addEdge(data: EdgeData): Edge | null {
-    if (!this.edgeRenderer) {
+    if (!this.edgeRenderer || !this.leafer) {
       console.error('Graph not initialized')
       return null
     }
@@ -286,7 +267,6 @@ export class Graph {
 
   /**
    * 应用布局
-   * 单一职责：只负责调用布局算法和更新位置
    */
   async layout(type: string, options?: Record<string, unknown>): Promise<void> {
     if (!this.nodeRenderer || !this.edgeRenderer) {
@@ -309,7 +289,7 @@ export class Graph {
     // 更新边位置
     this.edges.forEach(edge => this.edgeRenderer!.update(edge))
 
-    // 自动适应视图（居中显示）
+    // 自动适应视图
     this.fitView()
 
     this.emit('afterlayout', { type: 'afterlayout' })
@@ -317,7 +297,6 @@ export class Graph {
 
   /**
    * 计算布局
-   * 提取为独立函数 (simplify)
    */
   private calculateLayout(type: string, options?: Record<string, unknown>): LayoutResult | null {
     const nodes = Array.from(this.nodes.values())
@@ -343,34 +322,33 @@ export class Graph {
 
   /**
    * 渲染节点
-   * 委托给渲染器 (frontend-design: 分离渲染逻辑)
    */
   private renderNode(node: Node): void {
-    if (!this.canvasLayer || !this.nodeRenderer) return
+    if (!this.leafer || !this.nodeRenderer) return
 
     const element = this.nodeRenderer.create(node)
-    this.canvasLayer.add(element)
+    this.leafer.add(element)
   }
 
   /**
    * 渲染边
    */
   private renderEdge(edge: Edge): void {
-    if (!this.canvasLayer || !this.edgeRenderer) return
+    if (!this.leafer || !this.edgeRenderer) return
 
     const element = this.edgeRenderer.create(edge)
-    if (element) this.canvasLayer.add(element)
+    if (element) this.leafer.add(element)
 
     const label = this.edgeRenderer['labelMap']?.get(edge.id)
-    if (label) this.canvasLayer.add(label)
+    if (label) this.leafer.add(label)
   }
 
   /**
-   * 适应视图 - 自动居中并缩放图谱
+   * 适应视图
    */
   fitView(): void {
-    if (!this.app || !this.canvasLayer || this.nodes.size === 0) {
-      console.log('Cannot fit view: app or canvasLayer not ready, or no nodes')
+    if (!this.leafer || this.nodes.size === 0) {
+      console.log('Cannot fit view: leafer not ready or no nodes')
       return
     }
 
@@ -392,29 +370,22 @@ export class Graph {
     const graphWidth = maxX - minX + padding * 2
     const graphHeight = maxY - minY + padding * 2
 
-    // 计算缩放 - 确保图谱完全显示在视口中
+    // 计算缩放
     const scaleX = (this.options.width - padding * 2) / graphWidth
     const scaleY = (this.options.height - padding * 2) / graphHeight
-    const scale = Math.min(scaleX, scaleY, 1.5) // 最大放大到 1.5 倍
+    const scale = Math.min(scaleX, scaleY, 1.5)
 
     // 计算中心点
     const centerX = (minX + maxX) / 2
     const centerY = (minY + maxY) / 2
 
-    // 应用变换 - 将图谱中心对准视口中心
+    // 应用变换
     const offsetX = this.options.width / 2 - centerX * scale
     const offsetY = this.options.height / 2 - centerY * scale
 
-    console.log('Fitting view:', {
-      bounds: { minX, minY, maxX, maxY },
-      graphSize: { width: graphWidth, height: graphHeight },
-      viewport: { width: this.options.width, height: this.options.height },
-      scale,
-      offset: { x: offsetX, y: offsetY }
-    })
+    console.log('Fitting view:', { scale, offsetX, offsetY })
 
-    // 重置变换并应用新的
-    this.canvasLayer.set({
+    this.leafer.set({
       x: offsetX,
       y: offsetY,
       scaleX: scale,
@@ -423,10 +394,10 @@ export class Graph {
   }
 
   /**
-   * 居中显示图谱（不改变缩放）
+   * 居中显示
    */
   fitCenter(): void {
-    if (!this.canvasLayer || this.nodes.size === 0) return
+    if (!this.leafer || this.nodes.size === 0) return
 
     let minX = Infinity
     let minY = Infinity
@@ -444,12 +415,11 @@ export class Graph {
     const centerX = (minX + maxX) / 2
     const centerY = (minY + maxY) / 2
 
-    // 保持当前缩放，只调整位置
-    const currentScale = this.canvasLayer.scaleX || 1
+    const currentScale = this.leafer.scaleX || 1
     const offsetX = this.options.width / 2 - centerX * currentScale
     const offsetY = this.options.height / 2 - centerY * currentScale
 
-    this.canvasLayer.set({
+    this.leafer.set({
       x: offsetX,
       y: offsetY,
     })
@@ -459,12 +429,9 @@ export class Graph {
    * 缩放到指定比例
    */
   zoomTo(scale: number): void {
-    if (!this.canvasLayer) return
-    
-    const centerX = this.options.width / 2
-    const centerY = this.options.height / 2
-    
-    this.canvasLayer.set({
+    if (!this.leafer) return
+
+    this.leafer.set({
       scaleX: scale,
       scaleY: scale,
     })
@@ -474,7 +441,7 @@ export class Graph {
    * 获取当前缩放比例
    */
   getZoom(): number {
-    return this.canvasLayer?.scaleX || 1
+    return this.leafer?.scaleX || 1
   }
 
   /**
@@ -487,7 +454,7 @@ export class Graph {
   }
 
   /**
-   * 清空数据（保留渲染）
+   * 清空数据
    */
   private clearData(): void {
     this.nodes.clear()
@@ -524,8 +491,7 @@ export class Graph {
   destroy(): void {
     this.clear()
     this.eventListeners.clear()
-    this.app?.destroy()
-    this.app = null
-    this.canvasLayer = null
+    this.leafer?.destroy()
+    this.leafer = null
   }
 }
