@@ -68,8 +68,15 @@ export class Graph {
       // 使用 Leafer 作为主画布
       const { Leafer } = leaferUIModule
       
+      // 给容器一个 id，方便 Leafer 选择
+      let viewId = container.id
+      if (!viewId) {
+        viewId = 'leafer-graph-' + Date.now()
+        container.id = viewId
+      }
+      
       this.leafer = new Leafer({
-        view: container,
+        view: '#' + viewId,
         width: this.options.width,
         height: this.options.height,
       })
