@@ -8,9 +8,11 @@ export class EdgeRenderer {
   private edgeMap = new Map<string, any>()
   private labelMap = new Map<string, any>()
   private LeaferUI: any
+  private Arrow: any
 
-  constructor(leaferUI: any) {
+  constructor(leaferUI: any, arrowPlugin?: any) {
     this.LeaferUI = leaferUI
+    this.Arrow = arrowPlugin
   }
 
   /**
@@ -70,6 +72,22 @@ export class EdgeRenderer {
   }
 
   /**
+   * 更新边的端点位置（用于拖拽时）
+   */
+  updateEndpoints(edgeId: string, x1: number, y1: number, x2: number, y2: number): void {
+    const line = this.edgeMap.get(edgeId)
+    if (!line) return
+
+    this.updateEdgePosition(line, x1, y1, x2, y2)
+
+    // 更新标签位置
+    const label = this.labelMap.get(edgeId)
+    if (label) {
+      this.updateLabelPosition(label, x1, y1, x2, y2)
+    }
+  }
+
+  /**
    * 删除边
    */
   remove(edgeId: string): void {
@@ -112,6 +130,11 @@ export class EdgeRenderer {
       strokeWidth: style.lineWidth || 1.5,
     }
 
+    // 如果有箭头插件，使用箭头
+    if (this.Arrow && style.arrow !== false) {
+      return this.createArrowLine(x1, y1, x2, y2, commonProps)
+    }
+
     switch (type) {
       case 'curve':
         return this.createCurve(x1, y1, x2, y2, commonProps)
@@ -119,6 +142,50 @@ export class EdgeRenderer {
       default:
         return this.createLine(x1, y1, x2, y2, commonProps)
     }
+  }
+
+  /**
+   * 创建带箭头的直线
+   */
+  private createArrowLine(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    props: any
+  ): any | null {
+    const Path = this.LeaferUI.Path
+    if (!Path) return null
+
+    // 创建带箭头的路径
+    const arrowSize = 10
+    const angle = Math.atan2(y2 - y1, x2 - x1)
+    
+    // 计算箭头端点（留点空隙不碰到节点中心）
+    const gap = 30 // 距离节点的间隙
+    const endX = x2 - Math.cos(angle) * gap
+    const endY = y2 - Math.sin(angle) * gap
+    const startX = x1 + Math.cos(angle) * gap
+    const startY = y1 + Math.sin(angle) * gap
+
+    // 箭头路径
+    const arrowAngle1 = angle + Math.PI / 6
+    const arrowAngle2 = angle - Math.PI / 6
+    const ax1 = endX - arrowSize * Math.cos(arrowAngle1)
+    const ay1 = endY - arrowSize * Math.sin(arrowAngle1)
+    const ax2 = endX - arrowSize * Math.cos(arrowAngle2)
+    const ay2 = endY - arrowSize * Math.sin(arrowAngle2)
+
+    const path = new Path({
+      ...props,
+      path: `M ${startX} ${startY} L ${endX} ${endY} M ${ax1} ${ay1} L ${endX} ${endY} L ${ax2} ${ay2}`,
+    })
+
+    // 存储端点信息用于更新
+    path.startPoint = { x: x1, y: y1 }
+    path.endPoint = { x: x2, y: y2 }
+
+    return path
   }
 
   /**
@@ -131,17 +198,18 @@ export class EdgeRenderer {
     y2: number,
     props: any
   ): any | null {
-    // 使用 Path 绘制直线
     const Path = this.LeaferUI.Path
-    if (Path) {
-      return new Path({
-        ...props,
-        path: `M ${x1} ${y1} L ${x2} ${y2}`,
-      })
-    }
+    if (!Path) return null
 
-    console.warn('Path not found in LeaferUI')
-    return null
+    const path = new Path({
+      ...props,
+      path: `M ${x1} ${y1} L ${x2} ${y2}`,
+    })
+
+    path.startPoint = { x: x1, y: y1 }
+    path.endPoint = { x: x2, y: y2 }
+
+    return path
   }
 
   /**
@@ -162,10 +230,15 @@ export class EdgeRenderer {
     const midX = (x1 + x2) / 2
     const midY = (y1 + y2) / 2 - 50
 
-    return new Path({
+    const path = new Path({
       ...props,
       path: `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`,
     })
+
+    path.startPoint = { x: x1, y: y1 }
+    path.endPoint = { x: x2, y: y2 }
+
+    return path
   }
 
   /**
@@ -196,15 +269,33 @@ export class EdgeRenderer {
     line: any,
     x1: number,
     y1: number,
-    x2: number,
-    y2: number
+    y2: number,
+    x2: number
   ): void {
     if (!line.set) return
 
-    // 更新路径
-    if (line.path !== undefined) {
-      line.set({ path: `M ${x1} ${y1} L ${x2} ${y2}` })
-    }
+    // 重新计算带箭头的路径
+    const arrowSize = 10
+    const angle = Math.atan2(y2 - y1, x2 - x1)
+    const gap = 30
+    const endX = x2 - Math.cos(angle) * gap
+    const endY = y2 - Math.sin(angle) * gap
+    const startX = x1 + Math.cos(angle) * gap
+    const startY = y1 + Math.sin(angle) * gap
+
+    const arrowAngle1 = angle + Math.PI / 6
+    const arrowAngle2 = angle - Math.PI / 6
+    const ax1 = endX - arrowSize * Math.cos(arrowAngle1)
+    const ay1 = endY - arrowSize * Math.sin(arrowAngle1)
+    const ax2 = endX - arrowSize * Math.cos(arrowAngle2)
+    const ay2 = endY - arrowSize * Math.sin(arrowAngle2)
+
+    line.set({ 
+      path: `M ${startX} ${startY} L ${endX} ${endY} M ${ax1} ${ay1} L ${endX} ${endY} L ${ax2} ${ay2}` 
+    })
+
+    line.startPoint = { x: x1, y: y1 }
+    line.endPoint = { x: x2, y: y2 }
   }
 
   /**

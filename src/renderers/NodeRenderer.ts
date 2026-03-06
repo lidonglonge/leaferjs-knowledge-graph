@@ -7,9 +7,11 @@ import type { NodeStyle } from '../types'
 export class NodeRenderer {
   private nodeMap = new Map<string, any>()
   private LeaferUI: any
+  private onDragCallback?: (nodeId: string, x: number, y: number) => void
 
-  constructor(leaferUI: any) {
+  constructor(leaferUI: any, onDrag?: (nodeId: string, x: number, y: number) => void) {
     this.LeaferUI = leaferUI
+    this.onDragCallback = onDrag
   }
 
   /**
@@ -29,7 +31,7 @@ export class NodeRenderer {
         throw new Error('Box component not found')
       }
 
-      // 将节点居中放置 (x, y 是中心点坐标)
+      // 将节点居中放置
       const container = new Box({
         x: node.x - size.width / 2,
         y: node.y - size.height / 2,
@@ -40,6 +42,9 @@ export class NodeRenderer {
         data: { nodeId: node.id },
       })
 
+      // 添加拖拽事件监听
+      this.attachDragEvents(container, node.id, size)
+
       this.nodeMap.set(node.id, container)
       return container
     } catch (error) {
@@ -49,14 +54,45 @@ export class NodeRenderer {
   }
 
   /**
-   * 更新节点位置
+   * 添加拖拽事件监听
+   */
+  private attachDragEvents(container: any, nodeId: string, size: { width: number; height: number }): void {
+    let startX = 0
+    let startY = 0
+
+    container.on('dragstart', (e: any) => {
+      startX = container.x
+      startY = container.y
+      console.log('Drag start:', nodeId, { x: startX, y: startY })
+    })
+
+    container.on('drag', (e: any) => {
+      // 计算中心点坐标
+      const centerX = container.x + size.width / 2
+      const centerY = container.y + size.height / 2
+      
+      // 回调通知外部
+      if (this.onDragCallback) {
+        this.onDragCallback(nodeId, centerX, centerY)
+      }
+    })
+
+    container.on('dragend', (e: any) => {
+      console.log('Drag end:', nodeId, { 
+        x: container.x + size.width / 2, 
+        y: container.y + size.height / 2 
+      })
+    })
+  }
+
+  /**
+   * 更新节点位置（外部调用）
    */
   update(node: Node): void {
     const box = this.nodeMap.get(node.id)
     if (!box) return
 
     const size = this.normalizeSize(node.style?.size)
-    // 更新位置时保持居中
     box.set({ 
       x: node.x - size.width / 2, 
       y: node.y - size.height / 2 

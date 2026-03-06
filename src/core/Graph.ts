@@ -62,7 +62,7 @@ export class Graph {
    * 初始化 Leafer 画布
    * 需要在运行时传入 LeaferUI 模块
    */
-  init(leaferUIModule: any): void {
+  init(leaferUIModule: any, arrowPlugin?: any): void {
     if (!leaferUIModule) {
       console.error('LeaferUI module is required')
       return
@@ -70,8 +70,28 @@ export class Graph {
 
     this.LeaferUI = leaferUIModule
     this.initLeafer()
-    this.nodeRenderer = new NodeRenderer(leaferUIModule)
-    this.edgeRenderer = new EdgeRenderer(leaferUIModule)
+    
+    // 创建渲染器，传入拖拽回调
+    this.nodeRenderer = new NodeRenderer(leaferUIModule, this.handleNodeDrag.bind(this))
+    this.edgeRenderer = new EdgeRenderer(leaferUIModule, arrowPlugin)
+  }
+
+  /**
+   * 处理节点拖拽事件
+   */
+  private handleNodeDrag(nodeId: string, x: number, y: number): void {
+    const node = this.nodes.get(nodeId)
+    if (!node) return
+
+    // 更新节点数据
+    node.setPosition(x, y)
+
+    // 更新所有与该节点相关的边
+    this.edges.forEach(edge => {
+      if (edge.source === nodeId || edge.target === nodeId) {
+        this.edgeRenderer?.update(edge)
+      }
+    })
   }
 
   /**
